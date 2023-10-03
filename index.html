@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+</head>
+<style>
+    body {
+        padding: 5%;
+    }
+    .tabla-scroll {
+        max-height: 300px; /* Ajusta la altura máxima según tu preferencia */
+        overflow-y: auto;
+    }
+    .encabezado {
+        position: inherit;
+    }
+</style>
+<body>
+    <h1>Tabulador del Factor de Darcy</h1>
+    <h3>Completa los siguientes campos:</h3>
+    <br>
+    <div class="mb-3">
+        <input type="number" placeholder="Densidad (kg/m3)" id="densidad">
+        <input type="number" placeholder="Viscosidad (Pa*s)" id="viscosidad">
+        <input type="number" placeholder="Longitud (m)" id="longitud">
+        <input type="number" placeholder="Diámetro interno (m)" id="diametro">
+        <input type="number" placeholder="Pérdida total (kg/m3)" id="perdida">
+        <button type="button" class="btn btn-dark" id="calcular">Tabular</button>
+    </div>
+
+    <div class="tabla-scroll"> <!-- Agregamos una clase para la barra de desplazamiento -->
+        <table class="table">
+            <thead>
+                <tr class="encabezado">
+                    <th>Factor de Darcy</th>
+                    <th>Caudal (m^3/s)</th>
+                    <th>Reynolds</th>
+                </tr>
+            </thead>
+            <tbody id="tabla-body">
+                <!-- Aquí se insertarán las filas de la tabla -->
+            </tbody>
+        </table>
+    </div>
+
+    <div>
+        <canvas id="grafica" width="400" height="400"></canvas>
+    </div>
+
+    <h3>Desarrollado por: Carlos Adrián Espinosa Luna :)</h3>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const densidad = document.querySelector("#densidad");
+            const viscosidad = document.querySelector("#viscosidad");
+            const longitud = document.querySelector("#longitud");
+            const diametro = document.querySelector("#diametro");
+            const perdida = document.querySelector("#perdida");
+
+            const tablaBody = document.querySelector("#tabla-body");
+            const graficaCanvas = document.querySelector("#grafica");
+
+            document.querySelector("#calcular").addEventListener("click", () => {
+                let valores = [parseFloat(densidad.value), parseFloat(viscosidad.value), parseFloat(longitud.value), parseFloat(diametro.value), parseFloat(perdida.value)];
+
+                const A = Math.sqrt((valores[4] * (valores[3] ** 5)) / (0.0826 * valores[2]));
+                const B = (4 * valores[0]) / (Math.PI * valores[1] * valores[3]);
+
+                // Rangos de iteración.
+                const rangos = [0.008, 0.1];
+
+                // Arreglos para almacenar los datos de la tabla y la gráfica
+                const datosTabla = [];
+                const datosDarcy = [];
+                const datosCaudal = [];
+                const datosReynolds = [];
+
+                // Definir una variable para rastrear la convergencia
+                let convergencia = false;
+
+                for (let darcy = rangos[0]; darcy < rangos[1]; darcy += 0.0001) {
+                    let caudal = A / Math.sqrt(darcy);
+                    let reynolds = B * caudal;
+
+                    // Verificar convergencia a partir del segundo valor calculado
+                    if (datosCaudal.length >= 2) {
+                        const caudalAnterior = parseFloat(datosCaudal[datosCaudal.length - 1]);
+                        const diferencia = Math.abs(caudal - caudalAnterior);
+
+                        // Si la diferencia es menor que un umbral, considerarlo como convergencia
+                        if (diferencia < 0.00001) {
+                            convergencia = true;
+                            break;  // Salir del bucle cuando se detecte la convergencia
+                        }
+                    }
+
+                    // Agregar datos a la tabla
+                    datosTabla.push([darcy.toFixed(5), caudal.toFixed(6), reynolds.toFixed(4)]);
+
+                    // Agregar datos a los arreglos para la gráfica
+                    datosDarcy.push(darcy.toFixed(5));
+                    datosCaudal.push(caudal.toFixed(6));
+                    datosReynolds.push(reynolds.toFixed(4));
+                }
+
+                if (convergencia) {
+                    alert("Convergencia detectada. El bucle ha finalizado.");
+                }
+
+                // Crear filas de la tabla
+                tablaBody.innerHTML = "";
+                datosTabla.forEach((fila) => {
+                    const tr = document.createElement("tr");
+                    fila.forEach((dato) => {
+                        const td = document.createElement("td");
+                        td.textContent = dato;
+                        tr.appendChild(td);
+                    });
+                    tablaBody.appendChild(tr);
+                });
+
+                // Crear gráfica
+                const ctx = graficaCanvas.getContext("2d");
+                new Chart(ctx, {
+                    type: "line",
+                    data: {
+                        labels: datosDarcy,
+                        datasets: [
+                            {
+                                label: "Caudal",
+                                data: datosCaudal,
+                                borderColor: "blue",
+                                backgroundColor: "transparent",
+                                yAxisID: "y-axis-1",
+                            },
+                            {
+                                label: "Reynolds",
+                                data: datosReynolds,
+                                borderColor: "red",
+                                backgroundColor: "transparent",
+                                yAxisID: "y-axis-2",
+                            },
+                        ],
+                    },
+                    options: {
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                            },
+                            y: {
+                                type: "linear",
+                                position: "left",
+                                title: {
+                                    display: true,
+                                    text: "Caudal",
+                                },
+                                id: "y-axis-1",
+                            },
+                            y2: {
+                                type: "linear",
+                                position: "right",
+                                title: {
+                                    display: true,
+                                    text: "Reynolds",
+                                },
+                                id: "y-axis-2",
+                            },
+                        },
+                    },
+                });
+            });
+        });
+    </script>
+</body>
+</html>
